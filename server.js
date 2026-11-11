@@ -65,7 +65,7 @@ async function osmSearch(village, tehsil, district, kind) {
   if (hit && Date.now() - hit.t < 6 * 3600 * 1000) return hit.data;
   try {
     const geo = await geocode(village, tehsil, district);
-    if (!geo) { console.log("Jagah nahi mili:", village, tehsil, district); return { places: [], where: "" }; }
+    if (!geo) { console.log("Jagah nahi mili:", village, tehsil, district); return { places: [], where: "", error: "jagah map par nahi mili" }; }
     const types = kind === "dawai" ? "pharmacy" : kind === "doctor" ? "doctors|clinic|hospital" : "pharmacy|doctors|clinic|hospital";
     const q = `[out:json][timeout:15];nwr["amenity"~"^(${types})$"](around:10000,${geo.lat},${geo.lon});out center 40;`;
     const o = await fetch("https://overpass-api.de/api/interpreter", {
@@ -90,7 +90,7 @@ async function osmSearch(village, tehsil, district, kind) {
     return result;
   } catch (e) {
     console.log("OSM error:", e.message);
-    return { places: [], where: "" };
+    return { places: [], where: "", error: e.message };
   }
 }
 
@@ -118,7 +118,7 @@ app.get("/api/search", async (req, res) => {
   if (!onlyOpen) osm = await osmSearch(village, tehsil, district, kind);
   const names = new Set(own.map(p => p.name.toLowerCase()));
   const list = own.concat(osm.places.filter(p => !names.has(p.name.toLowerCase())));
-  const where = osm.where ? " (map par jagah: " + osm.where + ")" : "";
+  const where = osm.where ? " (map par jagah: " + osm.where + ")" : osm.error ? " (map error: " + osm.error + ")" : "";
 
   res.json({
     found: list.length > 0,
