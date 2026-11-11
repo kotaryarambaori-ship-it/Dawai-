@@ -4,7 +4,9 @@ const path = require("path");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const ADMIN_KEY = process.env.ADMIN_KEY || ""; // Render Environment mein set karo
+const ADMIN_KEY = process.env.ADMIN_KEY || "";
+const CONTACT = process.env.CONTACT_EMAIL || "apna-email@example.com"; // OpenStreetMap ko batane ke liye
+const UA = "DawaiDoctorApp/1.0 (" + CONTACT + ")";
 const DB = path.join(__dirname, "places.json");
 
 // Demo data (nakli naam aur number, sirf test ke liye)
@@ -33,27 +35,68 @@ function isOpenNow(p) {
   const [oh, om] = p.open.split(":").map(Number);
   const [ch, cm] = p.close.split(":").map(Number);
   const o = oh * 60 + om, c = ch * 60 + cm;
-  return c > o ? now >= o && now < c : now >= o || now < c; // raat ko paar karne wala samay
+  return c > o ? now >= o && now < c : now >= o || now < c;
+}
+
+// OpenStreetMap se gaon ke 10 km aas-paas ki dukan aur doctors
+const cache = new Map();
+async function osmSearch(village, kind) {
+  const key = village.toLowerCase() + "|" + kind;
+  const hit = cache.get(key);
+  if (hit && Date.now() - hit.t < 6 * 3600 * 1000) return hit.data;
+  try {
+    const g = await fetch(
+      "https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=in&q=" + encodeURIComponent(village),
+      { headers: { "User-Agent": UA }, signal: AbortSignal.timeout(10000) });
+    const geo = await g.json();
+    if (!geo.length) return [];
+    const types = kind === "dawai" ? "pharmacy" : kind === "doctor" ? "doctors|clinic|hospital" : "pharmacy|doctors|clinic|hospital";
+    const q = `[out:json][timeout:15];nwr["amenity"~"^(${types})$"](around:10000,${geo[0].lat},${geo[0].lon});out center 40;`;
+    const o = await fetch("https://overpass-api.de/api/interpreter", {
+      method: "POST",
+      headers: { "User-Agent": UA, "Content-Type": "application/x-www-form-urlencoded" },
+      body: "data=" + encodeURIComponent(q),
+      signal: AbortSignal.timeout(20000)
+    });
+    const data = await o.json();
+    const places = (data.elements || []).filter(e => e.tags && e.tags.name).map(e => ({
+      id: "osm" + e.id,
+      kind: e.tags.amenity === "pharmacy" ? "dawai" : "doctor",
+      name: e.tags.name,
+      village: "Aas-paas (10 km)",
+      phone: (e.tags.phone || e.tags["contact:phone"] || "").replace(/[^\d+]/g, ""),
+      open: "", close: "", closedDay: "",
+      note: e.tags.opening_hours ? "Samay: " + e.tags.opening_hours : "Samay pata nahi, phone karke pooch lo",
+      openNow: null, source: "osm"
+    }));
+    cache.set(key, { t: Date.now(), data: places });
+    return places;
+  } catch { return []; }
 }
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
 
-app.get("/api/search", (req, res) => {
-  const village = clean(req.query.village).toLowerCase();
+app.get("/api/search", async (req, res) => {
+  const village = clean(req.query.village);
   const kind = clean(req.query.kind);
   const onlyOpen = req.query.open === "1";
-  let list = load().map(p => ({ ...p, openNow: isOpenNow(p) }));
-  list = list.filter(p =>
-    (!village || p.village.toLowerCase().includes(village)) &&
-    (!kind || p.kind === kind) &&
-    (!onlyOpen || p.openNow));
-  list.sort((a, b) => Number(b.openNow) - Number(a.openNow));
+
+  const own = load()
+    .map(p => ({ ...p, openNow: isOpenNow(p) }))
+    .filter(p => (!village || p.village.toLowerCase().includes(village.toLowerCase())) &&
+                 (!kind || p.kind === kind) && (!onlyOpen || p.openNow));
+  own.sort((a, b) => Number(b.openNow) - Number(a.openNow));
+
+  const osm = village && !onlyOpen ? await osmSearch(village, kind) : [];
+  const names = new Set(own.map(p => p.name.toLowerCase()));
+  const list = own.concat(osm.filter(p => !names.has(p.name.toLowerCase())));
+
   res.json({
     found: list.length > 0,
     count: list.length,
     places: list.slice(0, 50),
-    message: list.length ? list.length + " jagah mili." : "Is jagah par abhi koi record nahi mila."
+    message: list.length ? list.length + " jagah mili." : "Is gaon ke paas koi record nahi mila."
   });
 });
 
