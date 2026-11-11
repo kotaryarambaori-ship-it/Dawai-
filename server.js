@@ -68,7 +68,7 @@ async function osmSearch(village, tehsil, district, kind) {
     if (!geo) { console.log("Jagah nahi mili:", village, tehsil, district); return { places: [], where: "", error: "jagah map par nahi mili" }; }
     const types = kind === "dawai" ? "pharmacy" : kind === "doctor" ? "doctors|clinic|hospital" : "pharmacy|doctors|clinic|hospital";
     const q = `[out:json][timeout:15];nwr["amenity"~"^(${types})$"](around:10000,${geo.lat},${geo.lon});out center 40;`;
-           const MIRRORS = [
+    const MIRRORS = [
       "https://overpass-api.de/api/interpreter",
       "https://lz4.overpass-api.de/api/interpreter",
       "https://z.overpass-api.de/api/interpreter",
@@ -89,6 +89,7 @@ async function osmSearch(village, tehsil, district, kind) {
       } catch (err) { console.log("Overpass mirror fail:", url, err.message); }
     }
     if (!data) return { places: [], where: "", error: "map server abhi vyast hai, 1-2 minute baad dobara try karo" };
+    const places = (data.elements || []).filter(e => e.tags && e.tags.name).map(e => ({
       id: "osm" + e.id,
       kind: e.tags.amenity === "pharmacy" ? "dawai" : "doctor",
       name: e.tags.name,
@@ -103,7 +104,7 @@ async function osmSearch(village, tehsil, district, kind) {
     return result;
   } catch (e) {
     console.log("OSM error:", e.message);
-    return { places: [], where: "", error: e.message };
+    return { places: [], where: "", error: e.message + (e.cause ? " / " + (e.cause.code || e.cause.message) : "") };
   }
 }
 
