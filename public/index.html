@@ -38,8 +38,12 @@ details summary{cursor:pointer;font-weight:700}
 
   <section class="card">
     <h2>🔎 Dhoondo</h2>
-    <label for="village">Gaon ya jagah</label>
-    <input id="village" placeholder="Jaise: Panduwa">
+    <label for="village">Village (Gaon)</label>
+    <input id="village" placeholder="Jaise: Lalapur">
+    <div class="row">
+      <div><label for="tehsil">Tehsil</label><input id="tehsil"></div>
+      <div><label for="district">District (Zila)</label><input id="district"></div>
+    </div>
     <label for="kind">Kya chahiye?</label>
     <select id="kind">
       <option value="">Dawai dukan aur doctor dono</option>
@@ -59,7 +63,11 @@ details summary{cursor:pointer;font-weight:700}
       <label for="akind">Prakar</label>
       <select id="akind"><option value="dawai">Dawai dukan</option><option value="doctor">Doctor</option></select>
       <label for="aname">Naam *</label><input id="aname">
-      <label for="avillage">Gaon *</label><input id="avillage">
+      <label for="avillage">Village (Gaon) *</label><input id="avillage">
+      <div class="row">
+        <div><label for="atehsil">Tehsil</label><input id="atehsil"></div>
+        <div><label for="adistrict">District (Zila)</label><input id="adistrict"></div>
+      </div>
       <label for="aphone">Phone</label><input id="aphone" type="tel" inputmode="tel">
       <div class="row">
         <div><label for="aopen">Khulta hai</label><input id="aopen" type="time" value="09:00"></div>
@@ -83,7 +91,7 @@ function show(t, c) { const m = $("msg"); m.textContent = t; m.className = "msg 
 const DAY = { Sun: "Ravivar", Mon: "Somvar", Tue: "Mangalvar", Wed: "Budhvar", Thu: "Guruvar", Fri: "Shukravar", Sat: "Shanivar" };
 
 $("searchBtn").addEventListener("click", async () => {
-  const p = new URLSearchParams({ village: $("village").value.trim(), kind: $("kind").value });
+  const p = new URLSearchParams({ village: $("village").value.trim(), tehsil: $("tehsil").value.trim(), district: $("district").value.trim(), kind: $("kind").value });
   if ($("open").checked) p.set("open", "1");
   const btn = $("searchBtn");
   btn.disabled = true; btn.textContent = "Dhoond rahe hain...";
@@ -97,7 +105,7 @@ $("searchBtn").addEventListener("click", async () => {
       <div class="pl">
         <b>${x.kind === "doctor" ? "🩺" : "💊"} ${esc(x.name)}</b>
         ${x.openNow === true ? '<span class="tag on">Abhi khula</span>' : x.openNow === false ? '<span class="tag off">Abhi band</span>' : ""}
-        <p>${esc(x.village)}${x.open ? " | " + esc(x.open) + " se " + esc(x.close) : ""}${x.closedDay ? " | " + DAY[x.closedDay] + " band" : ""}</p>
+        <p>${[x.village, x.tehsil, x.district].filter(Boolean).map(esc).join(", ")}${x.open ? " | " + esc(x.open) + " se " + esc(x.close) : ""}${x.closedDay ? " | " + DAY[x.closedDay] + " band" : ""}</p>
         ${x.note ? `<p>${esc(x.note)}</p>` : ""}
         ${x.phone ? `<a class="call" href="tel:${esc(x.phone)}">📞 ${esc(x.phone)}</a>` : ""}
       </div>`).join("") + (d.places.some(x => x.source === "osm") ? '<p class="note">Kuch data © OpenStreetMap contributors se hai.</p>' : "");
@@ -106,16 +114,15 @@ $("searchBtn").addEventListener("click", async () => {
 });
 
 $("addBtn").addEventListener("click", async () => {
-  const body = { kind: $("akind").value, name: $("aname").value, village: $("avillage").value, phone: $("aphone").value,
+  const body = { kind: $("akind").value, name: $("aname").value, village: $("avillage").value, tehsil: $("atehsil").value, district: $("adistrict").value, phone: $("aphone").value,
     open: $("aopen").value, close: $("aclose").value, closedDay: $("aday").value, note: $("anote").value };
   try {
     const res = await fetch("/api/places", { method: "POST", headers: { "Content-Type": "application/json", "x-admin-key": $("akey").value }, body: JSON.stringify(body) });
     const d = await res.json();
     show(res.ok ? d.message : d.error, res.ok ? "ok" : "err");
-    if (res.ok) ["aname", "avillage", "aphone", "anote"].forEach(i => $(i).value = "");
+    if (res.ok) ["aname", "avillage", "atehsil", "adistrict", "aphone", "anote"].forEach(i => $(i).value = "");
   } catch { show("Server se connect nahi hua.", "err"); }
 });
 </script>
 </body>
-  </html>
-  
+</html>
