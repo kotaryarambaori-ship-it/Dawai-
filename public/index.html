@@ -96,11 +96,11 @@ $("searchBtn").addEventListener("click", async () => {
     $("results").innerHTML = d.places.map(x => `
       <div class="pl">
         <b>${x.kind === "doctor" ? "🩺" : "💊"} ${esc(x.name)}</b>
-        <span class="tag ${x.openNow ? "on" : "off"}">${x.openNow ? "Abhi khula" : "Abhi band"}</span>
-        <p>${esc(x.village)} | ${esc(x.open)} se ${esc(x.close)}${x.closedDay ? " | " + DAY[x.closedDay] + " band" : ""}</p>
+        ${x.openNow === true ? '<span class="tag on">Abhi khula</span>' : x.openNow === false ? '<span class="tag off">Abhi band</span>' : ""}
+        <p>${esc(x.village)}${x.open ? " | " + esc(x.open) + " se " + esc(x.close) : ""}${x.closedDay ? " | " + DAY[x.closedDay] + " band" : ""}</p>
         ${x.note ? `<p>${esc(x.note)}</p>` : ""}
         ${x.phone ? `<a class="call" href="tel:${esc(x.phone)}">📞 ${esc(x.phone)}</a>` : ""}
-      </div>`).join("");
+      </div>`).join("") + (d.places.some(x => x.source === "osm") ? '<p class="note">Kuch data © OpenStreetMap contributors se hai.</p>' : "");
   } catch { show("Server se connect nahi hua. Ek minute ruk kar dobara try karo.", "err"); }
   finally { btn.disabled = false; btn.textContent = "🔍 Dhoondo"; }
 });
@@ -117,4 +117,4 @@ $("addBtn").addEventListener("click", async () => {
 });
 </script>
 </body>
-  </html>
+      </html>
