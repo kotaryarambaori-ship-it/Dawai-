@@ -5,8 +5,6 @@ const path = require("path");
 const app = express();
 const PORT = process.env.PORT || 3000;
 const ADMIN_KEY = process.env.ADMIN_KEY || "";
-const CONTACT = process.env.CONTACT_EMAIL || "apna-link-ya-email";
-const UA = "DawaiDoctorApp/1.0 (" + CONTACT + ")";
 const DB = path.join(__dirname, "places.json");
 
 // Demo data (nakli naam aur number, sirf test ke liye)
@@ -39,110 +37,53 @@ function isOpenNow(p) {
   return c > o ? now >= o && now < c : now >= o || now < c;
 }
 
-// OpenStreetMap: gaon, tehsil, zila se jagah dhoondo, phir 10 km aas-paas ki dukan aur doctors
-const cache = new Map();
-
-async function geocode(village, tehsil, district) {
-  const tries = [
-    [village, tehsil, district],
-    [village, district],
-    [village, tehsil],
-    [village]
-  ].map(a => a.filter(Boolean).join(", "));
-  for (const q of [...new Set(tries)]) {
-    const g = await fetch(
-      "https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=in&q=" + encodeURIComponent(q + ", India"),
-      { headers: { "User-Agent": UA }, signal: AbortSignal.timeout(10000) });
-    const geo = await g.json();
-    if (geo.length) return geo[0];
+// Pehle gaon, nahi mila to usi tehsil, phir usi zila ke record
+function findPlaces(all, q) {
+  const base = all.filter(p => (!q.kind || p.kind === q.kind) && (!q.onlyOpen || p.openNow));
+  let places = base.filter(p => has(p.village, q.village) && has(p.tehsil, q.tehsil) && has(p.district, q.district));
+  if (places.length) return { places, level: "gaon" };
+  if (q.village && q.tehsil) {
+    places = base.filter(p => has(p.tehsil, q.tehsil) && has(p.district, q.district));
+    if (places.length) return { places, level: "tehsil" };
   }
-  return null;
-}
-
-const sleep = ms => new Promise(r => setTimeout(r, ms));
-
-async function osmSearch(village, tehsil, district, kind) {
-  const key = [village, tehsil, district, kind].join("|").toLowerCase();
-  const hit = cache.get(key);
-  if (hit && Date.now() - hit.t < 6 * 3600 * 1000) return hit.data;
-  try {
-    const geo = await geocode(village, tehsil, district);
-    if (!geo) { console.log("Jagah nahi mili:", village, tehsil, district); return { places: [], where: "", error: "jagah map par nahi mili" }; }
-    const lat = Number(geo.lat), lon = Number(geo.lon), d = 0.09; // lagbhag 10 km
-    const viewbox = [lon - d, lat + d, lon + d, lat - d].join(",");
-    const terms = kind === "dawai" ? ["pharmacy"]
-      : kind === "doctor" ? ["clinic", "hospital", "doctors"]
-      : ["pharmacy", "clinic", "hospital", "doctors"];
-    const seen = new Set();
-    const places = [];
-    let failed = 0;
-    for (const term of terms) {
-      await sleep(1100); // map server ka niyam: ek second mein ek request
-      try {
-        const r = await fetch(
-          "https://nominatim.openstreetmap.org/search?format=jsonv2&limit=20&extratags=1&bounded=1&viewbox=" + viewbox + "&q=" + encodeURIComponent(term),
-          { headers: { "User-Agent": UA }, signal: AbortSignal.timeout(10000) });
-        if (!r.ok) { console.log("Nominatim", term, "status", r.status); failed++; continue; }
-        const list = await r.json();
-        for (const e of list) {
-          const name = e.name || "";
-          if (!name || seen.has(e.place_id)) continue;
-          seen.add(e.place_id);
-          const x = e.extratags || {};
-          places.push({
-            id: "osm" + e.place_id,
-            kind: e.type === "pharmacy" ? "dawai" : "doctor",
-            name,
-            village: "Aas-paas (10 km)", tehsil: "", district: "",
-            phone: (x.phone || x["contact:phone"] || "").replace(/[^\d+]/g, ""),
-            open: "", close: "", closedDay: "",
-            note: x.opening_hours ? "Samay: " + x.opening_hours : "Samay pata nahi, phone karke pooch lo",
-            openNow: null, source: "osm"
-          });
-        }
-      } catch (err) { console.log("Nominatim fail:", term, err.message); failed++; }
-    }
-    if (failed === terms.length) return { places: [], where: "", error: "map server abhi vyast hai, 1-2 minute baad dobara try karo" };
-    const result = { places, where: geo.display_name.split(",").slice(0, 3).join(",").trim() };
-    cache.set(key, { t: Date.now(), data: result });
-    return result;
-  } catch (e) {
-    console.log("OSM error:", e.message);
-    return { places: [], where: "", error: e.message + (e.cause ? " / " + (e.cause.code || e.cause.message) : "") };
+  if (q.district) {
+    places = base.filter(p => has(p.district, q.district));
+    if (places.length) return { places, level: "zila" };
   }
+  return { places: [], level: "none" };
 }
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
 
-app.get("/api/search", async (req, res) => {
-  const village = clean(req.query.village);
-  const tehsil = clean(req.query.tehsil);
-  const district = clean(req.query.district);
-  const kind = clean(req.query.kind);
-  const onlyOpen = req.query.open === "1";
-
-  if (!village && !tehsil && !district) {
+app.get("/api/search", (req, res) => {
+  const q = {
+    village: clean(req.query.village),
+    tehsil: clean(req.query.tehsil),
+    district: clean(req.query.district),
+    kind: clean(req.query.kind),
+    onlyOpen: req.query.open === "1"
+  };
+  if (!q.village && !q.tehsil && !q.district) {
     return res.status(400).json({ error: "Gaon, tehsil ya zila mein se kam se kam ek likho." });
   }
 
-  const own = load()
-    .map(p => ({ ...p, openNow: isOpenNow(p) }))
-    .filter(p => has(p.village, village) && has(p.tehsil, tehsil) && has(p.district, district) &&
-                 (!kind || p.kind === kind) && (!onlyOpen || p.openNow));
-  own.sort((a, b) => Number(b.openNow) - Number(a.openNow));
+  const all = load().map(p => ({ ...p, openNow: isOpenNow(p) }));
+  const { places, level } = findPlaces(all, q);
+  places.sort((a, b) => Number(b.openNow) - Number(a.openNow));
 
-  let osm = { places: [], where: "" };
-  if (!onlyOpen) osm = await osmSearch(village, tehsil, district, kind);
-  const names = new Set(own.map(p => p.name.toLowerCase()));
-  const list = own.concat(osm.places.filter(p => !names.has(p.name.toLowerCase())));
-  const where = osm.where ? " (map par jagah: " + osm.where + ")" : osm.error ? " (map error: " + osm.error + ")" : "";
-
+  const messages = {
+    gaon: places.length + " jagah mili.",
+    tehsil: "Aapke gaon ka record nahi mila. Isi tehsil ke ye hain (phone karke pooch lo).",
+    zila: "Aapke gaon ya tehsil ka record nahi mila. Isi zila ke ye hain (phone karke pooch lo).",
+    none: "Abhi is jagah ka koi record nahi hai. Admin se record jodne ko kaho."
+  };
   res.json({
-    found: list.length > 0,
-    count: list.length,
-    places: list.slice(0, 50),
-    message: list.length ? list.length + " jagah mili." + where : "Koi record nahi mila." + where
+    found: places.length > 0,
+    level,
+    count: places.length,
+    places: places.slice(0, 50),
+    message: messages[level]
   });
 });
 
