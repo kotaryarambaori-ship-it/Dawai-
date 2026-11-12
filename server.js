@@ -59,6 +59,8 @@ async function geocode(village, tehsil, district) {
   return null;
 }
 
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
 async function osmSearch(village, tehsil, district, kind) {
   const key = [village, tehsil, district, kind].join("|").toLowerCase();
   const hit = cache.get(key);
@@ -66,39 +68,41 @@ async function osmSearch(village, tehsil, district, kind) {
   try {
     const geo = await geocode(village, tehsil, district);
     if (!geo) { console.log("Jagah nahi mili:", village, tehsil, district); return { places: [], where: "", error: "jagah map par nahi mili" }; }
-    const types = kind === "dawai" ? "pharmacy" : kind === "doctor" ? "doctors|clinic|hospital" : "pharmacy|doctors|clinic|hospital";
-    const q = `[out:json][timeout:15];nwr["amenity"~"^(${types})$"](around:10000,${geo.lat},${geo.lon});out center 40;`;
-    const MIRRORS = [
-      "https://overpass-api.de/api/interpreter",
-      "https://lz4.overpass-api.de/api/interpreter",
-      "https://z.overpass-api.de/api/interpreter",
-      "https://overpass.private.coffee/api/interpreter"
-    ];
-    let data = null;
-    for (const url of MIRRORS) {
+    const lat = Number(geo.lat), lon = Number(geo.lon), d = 0.09; // lagbhag 10 km
+    const viewbox = [lon - d, lat + d, lon + d, lat - d].join(",");
+    const terms = kind === "dawai" ? ["pharmacy"]
+      : kind === "doctor" ? ["clinic", "hospital", "doctors"]
+      : ["pharmacy", "clinic", "hospital", "doctors"];
+    const seen = new Set();
+    const places = [];
+    let failed = 0;
+    for (const term of terms) {
+      await sleep(1100); // map server ka niyam: ek second mein ek request
       try {
-        const o = await fetch(url, {
-          method: "POST",
-          headers: { "User-Agent": UA, "Content-Type": "application/x-www-form-urlencoded" },
-          body: "data=" + encodeURIComponent(q),
-          signal: AbortSignal.timeout(20000)
-        });
-        if (!o.ok) { console.log("Overpass", url, "status", o.status); continue; }
-        data = await o.json();
-        break;
-      } catch (err) { console.log("Overpass mirror fail:", url, err.message); }
+        const r = await fetch(
+          "https://nominatim.openstreetmap.org/search?format=jsonv2&limit=20&extratags=1&bounded=1&viewbox=" + viewbox + "&q=" + encodeURIComponent(term),
+          { headers: { "User-Agent": UA }, signal: AbortSignal.timeout(10000) });
+        if (!r.ok) { console.log("Nominatim", term, "status", r.status); failed++; continue; }
+        const list = await r.json();
+        for (const e of list) {
+          const name = e.name || "";
+          if (!name || seen.has(e.place_id)) continue;
+          seen.add(e.place_id);
+          const x = e.extratags || {};
+          places.push({
+            id: "osm" + e.place_id,
+            kind: e.type === "pharmacy" ? "dawai" : "doctor",
+            name,
+            village: "Aas-paas (10 km)", tehsil: "", district: "",
+            phone: (x.phone || x["contact:phone"] || "").replace(/[^\d+]/g, ""),
+            open: "", close: "", closedDay: "",
+            note: x.opening_hours ? "Samay: " + x.opening_hours : "Samay pata nahi, phone karke pooch lo",
+            openNow: null, source: "osm"
+          });
+        }
+      } catch (err) { console.log("Nominatim fail:", term, err.message); failed++; }
     }
-    if (!data) return { places: [], where: "", error: "map server abhi vyast hai, 1-2 minute baad dobara try karo" };
-    const places = (data.elements || []).filter(e => e.tags && e.tags.name).map(e => ({
-      id: "osm" + e.id,
-      kind: e.tags.amenity === "pharmacy" ? "dawai" : "doctor",
-      name: e.tags.name,
-      village: "Aas-paas (10 km)", tehsil: "", district: "",
-      phone: (e.tags.phone || e.tags["contact:phone"] || "").replace(/[^\d+]/g, ""),
-      open: "", close: "", closedDay: "",
-      note: e.tags.opening_hours ? "Samay: " + e.tags.opening_hours : "Samay pata nahi, phone karke pooch lo",
-      openNow: null, source: "osm"
-    }));
+    if (failed === terms.length) return { places: [], where: "", error: "map server abhi vyast hai, 1-2 minute baad dobara try karo" };
     const result = { places, where: geo.display_name.split(",").slice(0, 3).join(",").trim() };
     cache.set(key, { t: Date.now(), data: result });
     return result;
