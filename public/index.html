@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="hi">
 <head>
@@ -5,123 +6,237 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Dawai aur Doctor</title>
 <style>
-:root{--g:#0b6e8a;--bg:#eef6f8;--ink:#14262c;--line:#cfe0e5;--ok:#1d6b34;--red:#b3261e}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-header{background:var(--g);color:#fff;text-align:center;padding:26px 16px}
-header h1{margin:0;font-size:2rem}header p{margin:6px 0 0}
-main{max-width:520px;margin:0 auto;padding:16px}
-.card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:18px;margin-bottom:16px}
-h2{margin:0 0 6px;font-size:1.3rem}
-label{display:block;margin:12px 0 5px}
-input,select{width:100%;padding:13px;border:1px solid var(--line);border-radius:10px;font:inherit;background:#fff}
-input:focus,select:focus,button:focus-visible,a:focus-visible{outline:3px solid var(--g);outline-offset:1px}
-.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.chk{display:flex;align-items:center;gap:10px;margin-top:14px}.chk input{width:auto}
-button{width:100%;margin-top:14px;padding:14px;border:0;border-radius:10px;background:var(--g);color:#fff;font:inherit;font-weight:700;cursor:pointer}
+body{
+ margin:0;background:#f1f5f9;
+ font-family:Arial,sans-serif;color:#172033
+}
+header{
+ background:linear-gradient(135deg,#0f766e,#2563eb);
+ color:white;text-align:center;padding:30px 12px
+}
+main{max-width:700px;margin:20px auto;padding:12px}
+.card{
+ background:white;padding:18px;
+ border-radius:15px;margin-bottom:18px;
+ box-shadow:0 4px 15px #0001
+}
+h2{margin-top:0}
+input,select,textarea{
+ width:100%;padding:12px;margin:6px 0 12px;
+ border:1px solid #cbd5e1;border-radius:9px;
+ font-size:16px
+}
+button{
+ width:100%;padding:13px;border:0;
+ border-radius:9px;background:#0f766e;
+ color:white;font-size:17px;font-weight:bold
+}
 button:disabled{opacity:.6}
-.msg{display:none;margin-bottom:16px;padding:14px;border-radius:10px;background:#e3eaed}
-.msg.show{display:block}.msg.err{background:#fde7e5;color:var(--red)}.msg.ok{background:#dff3e4;color:var(--ok)}
-.pl{border:1px solid var(--line);border-radius:12px;padding:14px;margin-top:12px}
-.pl b{font-size:1.1rem}.pl p{margin:4px 0 0;color:#42585f}
-.tag{display:inline-block;padding:3px 10px;border-radius:99px;font-size:.85rem;font-weight:700;margin-left:6px}
-.tag.on{background:#dff3e4;color:var(--ok)}.tag.off{background:#fde7e5;color:var(--red)}
-.call{display:inline-block;margin-top:10px;color:var(--g);font-weight:700}
-.note{font-size:.9rem;color:#42585f;margin-top:12px}
-details summary{cursor:pointer;font-weight:700}
+#message{margin:12px 0;font-weight:bold}
+.result{
+ border:1px solid #ddd;padding:13px;
+ border-radius:10px;margin:10px 0
+}
+.result h3{margin:0 0 8px}
+a{color:#0f766e;font-weight:bold}
 </style>
 </head>
 <body>
-<header><h1>💊 Dawai aur Doctor</h1><p>Aapke gaon mein kaun khula hai</p></header>
+
+<header>
+<h1>💊 Dawai aur Doctor</h1>
+<p>अपने गाँव में डॉक्टर और मेडिकल खोजें</p>
+</header>
+
 <main>
-  <div class="msg" id="msg" role="status"></div>
+<section class="card">
+<h2>🔎 डॉक्टर या मेडिकल खोजें</h2>
 
-  <section class="card">
-    <h2>🔎 Dhoondo</h2>
-    <label for="village">Village (Gaon)</label>
-    <input id="village" placeholder="Jaise: Lalapur">
-    <div class="row">
-      <div><label for="tehsil">Tehsil</label><input id="tehsil"></div>
-      <div><label for="district">District (Zila)</label><input id="district"></div>
-    </div>
-    <label for="kind">Kya chahiye?</label>
-    <select id="kind">
-      <option value="">Dawai dukan aur doctor dono</option>
-      <option value="dawai">Sirf dawai dukan</option>
-      <option value="doctor">Sirf doctor</option>
-    </select>
-    <label class="chk"><input type="checkbox" id="open"> Sirf abhi khule hue</label>
-    <button id="searchBtn">🔍 Dhoondo</button>
-    <div id="results"></div>
-    <p class="note">⚠️ Samay dukan ya doctor ke maalik ne diya hai, badal bhi sakta hai. Jaane se pehle phone kar lo. Emergency mein <b>108</b> ya <b>112</b> par call karo. Dawai doctor ki salah se hi lo.</p>
-  </section>
+<form id="searchForm">
 
-  <section class="card">
-    <details>
-      <summary>➕ Dukan ya doctor jodo (admin)</summary>
-      <label for="akey">Admin key</label><input id="akey" type="password" autocomplete="off">
-      <label for="akind">Prakar</label>
-      <select id="akind"><option value="dawai">Dawai dukan</option><option value="doctor">Doctor</option></select>
-      <label for="aname">Naam *</label><input id="aname">
-      <label for="avillage">Village (Gaon) *</label><input id="avillage">
-      <div class="row">
-        <div><label for="atehsil">Tehsil</label><input id="atehsil"></div>
-        <div><label for="adistrict">District (Zila)</label><input id="adistrict"></div>
-      </div>
-      <label for="aphone">Phone</label><input id="aphone" type="tel" inputmode="tel">
-      <div class="row">
-        <div><label for="aopen">Khulta hai</label><input id="aopen" type="time" value="09:00"></div>
-        <div><label for="aclose">Band hota hai</label><input id="aclose" type="time" value="21:00"></div>
-      </div>
-      <label for="aday">Hafte mein band din</label>
-      <select id="aday">
-        <option value="">Koi nahi</option><option value="Sun">Ravivar</option><option value="Mon">Somvar</option>
-        <option value="Tue">Mangalvar</option><option value="Wed">Budhvar</option><option value="Thu">Guruvar</option>
-        <option value="Fri">Shukravar</option><option value="Sat">Shanivar</option>
-      </select>
-      <label for="anote">Note</label><input id="anote" maxlength="120" placeholder="Jaise: General physician">
-      <button id="addBtn">Save karo</button>
-    </details>
-  </section>
+<label>गाँव</label>
+<input id="village" required placeholder="गाँव का नाम">
+
+<label>तहसील</label>
+<input id="tehsil" required placeholder="तहसील">
+
+<label>जिला</label>
+<input id="district" required placeholder="जिला">
+
+<label>क्या खोजें?</label>
+<select id="type">
+<option value="all">सभी</option>
+<option value="doctor">डॉक्टर</option>
+<option value="medical">मेडिकल स्टोर</option>
+</select>
+
+<button id="findBtn" type="submit">Dhoondo</button>
+</form>
+
+<div id="message" role="status"></div>
+<div id="results"></div>
+</section>
+
+<section class="card">
+<h2>➕ Admin: नई जानकारी जोड़ें</h2>
+
+<form id="adminForm">
+
+<label>Admin Key</label>
+<input id="adminKey" type="password" required>
+
+<label>नाम</label>
+<input id="name" required>
+
+<label>प्रकार</label>
+<select id="newType">
+<option value="doctor">डॉक्टर</option>
+<option value="medical">मेडिकल स्टोर</option>
+</select>
+
+<label>गाँव</label>
+<input id="newVillage" required>
+
+<label>तहसील</label>
+<input id="newTehsil" required>
+
+<label>जिला</label>
+<input id="newDistrict" required>
+
+<label>पता</label>
+<textarea id="address"></textarea>
+
+<label>फोन नंबर</label>
+<input id="phone">
+
+<label>खुलने का समय</label>
+<input id="openTime" type="time">
+
+<label>बंद होने का समय</label>
+<input id="closeTime" type="time">
+
+<button id="addBtn">जानकारी सेव करें</button>
+</form>
+
+<div id="adminMessage"></div>
+</section>
 </main>
+
 <script>
 const $ = id => document.getElementById(id);
-const esc = s => { const d = document.createElement("div"); d.textContent = s == null ? "" : String(s); return d.innerHTML; };
-function show(t, c) { const m = $("msg"); m.textContent = t; m.className = "msg show " + (c || ""); m.scrollIntoView({ behavior: "smooth", block: "nearest" }); }
-const DAY = { Sun: "Ravivar", Mon: "Somvar", Tue: "Mangalvar", Wed: "Budhvar", Thu: "Guruvar", Fri: "Shukravar", Sat: "Shanivar" };
 
-$("searchBtn").addEventListener("click", async () => {
-  const p = new URLSearchParams({ village: $("village").value.trim(), tehsil: $("tehsil").value.trim(), district: $("district").value.trim(), kind: $("kind").value });
-  if ($("open").checked) p.set("open", "1");
-  const btn = $("searchBtn");
-  btn.disabled = true; btn.textContent = "Dhoond rahe hain...";
-  $("results").innerHTML = "";
-  try {
-    const res = await fetch("/api/search?" + p);
-    const d = await res.json();
-    if (!res.ok) return show(d.error || "Kuch gadbad hui.", "err");
-    show(d.message, d.found ? "ok" : "err");
-    $("results").innerHTML = d.places.map(x => `
-      <div class="pl">
-        <b>${x.kind === "doctor" ? "🩺" : "💊"} ${esc(x.name)}</b>
-        ${x.openNow === true ? '<span class="tag on">Abhi khula</span>' : x.openNow === false ? '<span class="tag off">Abhi band</span>' : ""}
-        <p>${[x.village, x.tehsil, x.district].filter(Boolean).map(esc).join(", ")}${x.open ? " | " + esc(x.open) + " se " + esc(x.close) : ""}${x.closedDay ? " | " + DAY[x.closedDay] + " band" : ""}</p>
-        ${x.note ? `<p>${esc(x.note)}</p>` : ""}
-        ${x.phone ? `<a class="call" href="tel:${esc(x.phone)}">📞 ${esc(x.phone)}</a>` : ""}
-      </div>`).join("") + (d.places.some(x => x.source === "osm") ? '<p class="note">Kuch data © OpenStreetMap contributors se hai.</p>' : "");
-  } catch { show("Server se connect nahi hua. Ek minute ruk kar dobara try karo.", "err"); }
-  finally { btn.disabled = false; btn.textContent = "🔍 Dhoondo"; }
+function message(id,text,error=false){
+ const el=$(id);
+ el.textContent=text;
+ el.style.color=error?"#b91c1c":"#166534";
+}
+
+$("searchForm").addEventListener("submit",async e=>{
+ e.preventDefault();
+
+ const button=$("findBtn");
+ const results=$("results");
+ results.replaceChildren();
+ message("message","खोज रहे हैं...");
+
+ button.disabled=true;
+
+ try{
+  const params=new URLSearchParams({
+   village:$("village").value.trim(),
+   tehsil:$("tehsil").value.trim(),
+   district:$("district").value.trim(),
+   type:$("type").value
+  });
+
+  const response=await fetch("/api/search?"+params);
+  const data=await response.json();
+
+  if(!response.ok) throw new Error(data.message);
+
+  message("message",data.message);
+
+  data.results.forEach(place=>{
+   const box=document.createElement("div");
+   box.className="result";
+
+   const title=document.createElement("h3");
+   title.textContent=place.name;
+
+   const info=document.createElement("p");
+   info.textContent=
+    (place.type==="doctor"?"डॉक्टर":"मेडिकल स्टोर")+
+    " | "+place.village+", "+place.tehsil+
+    ", "+place.district;
+
+   const address=document.createElement("p");
+   address.textContent=place.address||"पता उपलब्ध नहीं";
+
+   const phone=document.createElement("p");
+   phone.textContent=place.phone
+    ?"फोन: "+place.phone:"फोन नंबर उपलब्ध नहीं";
+
+   box.append(title,info,address,phone);
+
+   if(place.phone){
+    const call=document.createElement("a");
+    call.href="tel:"+place.phone;
+    call.textContent="📞 कॉल करें";
+    box.append(call);
+   }
+
+   results.append(box);
+  });
+
+ }catch(err){
+  message("message",
+   "खोज में समस्या: "+(err.message||"Server error"),true);
+ }finally{
+  button.disabled=false;
+ }
 });
 
-$("addBtn").addEventListener("click", async () => {
-  const body = { kind: $("akind").value, name: $("aname").value, village: $("avillage").value, tehsil: $("atehsil").value, district: $("adistrict").value, phone: $("aphone").value,
-    open: $("aopen").value, close: $("aclose").value, closedDay: $("aday").value, note: $("anote").value };
-  try {
-    const res = await fetch("/api/places", { method: "POST", headers: { "Content-Type": "application/json", "x-admin-key": $("akey").value }, body: JSON.stringify(body) });
-    const d = await res.json();
-    show(res.ok ? d.message : d.error, res.ok ? "ok" : "err");
-    if (res.ok) ["aname", "avillage", "atehsil", "adistrict", "aphone", "anote"].forEach(i => $(i).value = "");
-  } catch { show("Server se connect nahi hua.", "err"); }
+$("adminForm").addEventListener("submit",async e=>{
+ e.preventDefault();
+
+ const button=$("addBtn");
+ button.disabled=true;
+
+ try{
+  const payload={
+   name:$("name").value.trim(),
+   type:$("newType").value,
+   village:$("newVillage").value.trim(),
+   tehsil:$("newTehsil").value.trim(),
+   district:$("newDistrict").value.trim(),
+   address:$("address").value.trim(),
+   phone:$("phone").value.trim(),
+   openTime:$("openTime").value||null,
+   closeTime:$("closeTime").value||null
+  };
+
+  const response=await fetch("/api/places",{
+   method:"POST",
+   headers:{
+    "Content-Type":"application/json",
+    "x-admin-key":$("adminKey").value
+   },
+   body:JSON.stringify(payload)
+  });
+
+  const data=await response.json();
+  if(!response.ok) throw new Error(data.message);
+
+  message("adminMessage",data.message);
+  $("adminForm").reset();
+
+ }catch(err){
+  message("adminMessage",
+   "सेव नहीं हुआ: "+err.message,true);
+ }finally{
+  button.disabled=false;
+ }
 });
 </script>
 </body>
