@@ -2,280 +2,257 @@
 <!DOCTYPE html>
 <html lang="hi">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#0f766e">
-<title>Dawai aur Doctor</title>
-
-<style>
-*{box-sizing:border-box}
-body{
- margin:0;background:#f1f5f9;
- font-family:Arial,sans-serif;color:#172033
-}
-header{
- background:linear-gradient(135deg,#0f766e,#2563eb);
- color:white;text-align:center;padding:28px 12px
-}
-main{max-width:700px;margin:20px auto;padding:12px}
-.card{
- background:white;padding:18px;
- border-radius:15px;margin-bottom:18px;
- box-shadow:0 4px 15px #0001
-}
-h2{margin-top:0;color:#0f766e}
-label{display:block;font-weight:bold;margin-top:5px}
-input,select,textarea{
- width:100%;padding:12px;margin:6px 0 12px;
- border:1px solid #cbd5e1;border-radius:9px;
- font-size:16px;background:white
-}
-button{
- width:100%;padding:13px;border:0;
- border-radius:9px;background:#0f766e;
- color:white;font-size:17px;font-weight:bold;
- cursor:pointer
-}
-button:disabled{opacity:.6}
-#message,#adminMessage{
- margin:12px 0;font-weight:bold;line-height:1.5
-}
-.result{
- border:1px solid #ddd;padding:14px;
- border-radius:10px;margin:10px 0;
- background:#fff
-}
-.result h3{margin:0 0 8px;color:#0f766e}
-.result p{margin:7px 0;line-height:1.5}
-a{color:#0f766e;font-weight:bold}
-.small{font-size:13px;color:#64748b}
-footer{text-align:center;color:#64748b;padding:15px}
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#087f8c">
+  <title>दवाई और डॉक्टर खोजें</title>
+  <style>
+    *{box-sizing:border-box}
+    body{margin:0;background:#f1f5f9;color:#172033;font-family:Arial,sans-serif}
+    header{background:linear-gradient(135deg,#087f8c,#2563eb);color:white;padding:25px 16px;text-align:center}
+    header h1{margin:0 0 8px;font-size:25px}
+    header p{margin:0;font-size:14px}
+    main{max-width:720px;margin:18px auto;padding:0 12px 35px}
+    .card{background:white;border-radius:15px;padding:17px;margin-bottom:16px;box-shadow:0 3px 14px #0000000c}
+    h2{font-size:19px;margin:0 0 15px}
+    label{display:block;font-weight:600;font-size:14px;margin:12px 0 6px}
+    input,select{width:100%;padding:13px;border:1px solid #cbd5e1;border-radius:9px;font-size:16px;background:white}
+    button{border:0;border-radius:9px;padding:13px 17px;font-size:16px;font-weight:bold;cursor:pointer}
+    .primary{background:#087f8c;color:white;width:100%;margin-top:16px}
+    .adminbtn{background:#1e293b;color:white;width:100%}
+    .result{border:1px solid #e2e8f0;border-radius:13px;padding:15px;margin-top:12px;background:#fff}
+    .result h3{margin:0 0 8px;font-size:18px}
+    .tag{display:inline-block;background:#e0f2fe;color:#075985;padding:5px 9px;border-radius:20px;font-size:12px;margin-bottom:9px}
+    .detail{font-size:14px;color:#475569;margin:7px 0;line-height:1.5;overflow-wrap:anywhere}
+    .call{display:inline-block;background:#16a34a;color:white;text-decoration:none;padding:10px 15px;border-radius:8px;margin-top:8px;font-weight:bold}
+    .message{padding:12px;border-radius:9px;margin-top:12px;font-size:14px;display:none}
+    .success{display:block;background:#dcfce7;color:#166534}
+    .error{display:block;background:#fee2e2;color:#991b1b}
+    .info{display:block;background:#e0f2fe;color:#075985}
+    .empty{text-align:center;color:#64748b;padding:20px 8px}
+    .hidden{display:none}
+    .muted{color:#64748b;font-size:13px}
+    footer{text-align:center;color:#64748b;font-size:12px;padding:15px}
+  </style>
 </head>
-
 <body>
+
 <header>
-<h1>💊 Dawai aur Doctor</h1>
-<p>अपने गाँव में डॉक्टर और मेडिकल स्टोर खोजें</p>
+  <h1>🩺 दवाई और डॉक्टर खोजें</h1>
+  <p>अपने गाँव में डॉक्टर और मेडिकल स्टोर की जानकारी पाएँ</p>
 </header>
 
 <main>
 
-<section class="card">
-<h2>🔎 डॉक्टर या मेडिकल खोजें</h2>
+  <!-- SEARCH SECTION -->
+  <section class="card">
+    <h2>🔎 डॉक्टर / मेडिकल स्टोर ढूंढें</h2>
 
-<form id="searchForm">
-<label>गाँव</label>
-<input id="village" required placeholder="गाँव का नाम">
+    <form id="searchForm">
+      <label for="village">गाँव का नाम</label>
+      <input id="village" placeholder="गाँव का नाम लिखें" required>
 
-<label>तहसील</label>
-<input id="tehsil" required placeholder="तहसील">
+      <label for="tehsil">तहसील का नाम</label>
+      <input id="tehsil" placeholder="तहसील का नाम लिखें" required>
 
-<label>जिला</label>
-<input id="district" required placeholder="जिला">
+      <label for="district">जिले का नाम</label>
+      <input id="district" placeholder="जिले का नाम लिखें" required>
 
-<label>क्या खोजें?</label>
-<select id="type">
-<option value="all">सभी</option>
-<option value="doctor">डॉक्टर</option>
-<option value="medical">मेडिकल स्टोर</option>
-</select>
+      <label for="type">क्या ढूंढना है?</label>
+      <select id="type">
+        <option value="all">सभी — डॉक्टर और मेडिकल स्टोर</option>
+        <option value="doctor">केवल डॉक्टर</option>
+        <option value="medical">केवल मेडिकल स्टोर</option>
+      </select>
 
-<button id="findBtn" type="submit">🔎 ढूँढें</button>
-</form>
+      <button class="primary" id="searchBtn" type="submit">🔍 ढूंढो</button>
+    </form>
 
-<div id="message" role="status" aria-live="polite"></div>
-<div id="results"></div>
-</section>
+    <div id="searchMessage" class="message"></div>
+  </section>
 
-<section class="card">
-<h2>➕ Admin: नई जानकारी जोड़ें</h2>
-<p class="small">डॉक्टर या मेडिकल स्टोर की जानकारी जोड़ने के लिए Admin Key जरूरी है।</p>
+  <!-- RESULTS: ONLY SEARCH BUTTON SHOWS RESULTS -->
+  <section id="resultsSection" class="card hidden">
+    <h2 id="resultHeading">खोज के परिणाम</h2>
+    <div id="resultsList"></div>
+  </section>
 
-<form id="adminForm">
+  <!-- ADMIN SECTION -->
+  <section class="card">
+    <h2>🔐 एडमिन पैनल — जानकारी जोड़ें</h2>
+    <p class="muted">डॉक्टर या मेडिकल स्टोर की जानकारी यहाँ सेव करें।</p>
 
-<label>Admin Key</label>
-<input id="adminKey" type="password" required autocomplete="current-password">
+    <form id="adminForm">
+      <label for="adminKey">Admin Key</label>
+      <input id="adminKey" type="password" placeholder="अपनी Admin Key डालें" required>
 
-<label>नाम</label>
-<input id="name" required placeholder="डॉक्टर या मेडिकल स्टोर का नाम">
+      <label for="name">डॉक्टर / दुकान का नाम</label>
+      <input id="name" placeholder="नाम लिखें" required>
 
-<label>प्रकार</label>
-<select id="newType">
-<option value="doctor">डॉक्टर</option>
-<option value="medical">मेडिकल स्टोर</option>
-</select>
+      <label for="adminType">प्रकार</label>
+      <select id="adminType" required>
+        <option value="doctor">डॉक्टर</option>
+        <option value="medical">मेडिकल स्टोर</option>
+      </select>
 
-<label>गाँव</label>
-<input id="newVillage" required>
+      <label for="adminVillage">गाँव</label>
+      <input id="adminVillage" placeholder="गाँव का नाम" required>
 
-<label>तहसील</label>
-<input id="newTehsil" required>
+      <label for="adminTehsil">तहसील</label>
+      <input id="adminTehsil" placeholder="तहसील का नाम" required>
 
-<label>जिला</label>
-<input id="newDistrict" required>
+      <label for="adminDistrict">जिला</label>
+      <input id="adminDistrict" placeholder="जिले का नाम" required>
 
-<label>पता</label>
-<textarea id="address" placeholder="पूरा पता"></textarea>
+      <label for="address">पूरा पता</label>
+      <input id="address" placeholder="दुकान या क्लिनिक का पता">
 
-<label>फोन नंबर</label>
-<input id="phone" type="tel" placeholder="मोबाइल नंबर">
+      <label for="phone">मोबाइल नंबर</label>
+      <input id="phone" type="tel" placeholder="मोबाइल नंबर">
 
-<label>खुलने का समय</label>
-<input id="openTime" type="time">
+      <label for="openTime">खुलने का समय</label>
+      <input id="openTime" placeholder="जैसे सुबह 9 बजे">
 
-<label>बंद होने का समय</label>
-<input id="closeTime" type="time">
+      <label for="closeTime">बंद होने का समय</label>
+      <input id="closeTime" placeholder="जैसे शाम 6 बजे">
 
-<label>खुलने के दिन</label>
-<input id="openDays" placeholder="जैसे: सोमवार से शनिवार">
+      <label for="openDays">किस दिन खुलता है?</label>
+      <input id="openDays" placeholder="जैसे Monday to Sunday">
 
-<button id="addBtn" type="submit">जानकारी सेव करें</button>
-</form>
+      <button class="primary" id="saveBtn" type="submit">💾 जानकारी सेव करें</button>
+    </form>
 
-<div id="adminMessage" role="status" aria-live="polite"></div>
-</section>
-
-<section class="card">
-<h2>📊 Database स्थिति</h2>
-<button id="healthBtn" type="button">Database जाँचें</button>
-<div id="healthMessage" class="small"></div>
-</section>
+    <div id="saveMessage" class="message"></div>
+  </section>
 
 </main>
 
-<footer>
-Dawai aur Doctor
-</footer>
+<footer>दवाई और डॉक्टर खोजें | आपकी सुविधा के लिए</footer>
 
 <script>
 const $ = id => document.getElementById(id);
 
-function showMessage(id, text, error=false) {
-  const el = $(id);
-  el.textContent = text;
-  el.style.color = error ? "#b91c1c" : "#166534";
+function showMessage(element, message, type) {
+  element.textContent = message;
+  element.className = "message " + type;
 }
 
-async function readResponse(response) {
-  const data = await response.json().catch(() => ({}));
-
-  if (!response.ok) {
-    throw new Error(data.error || data.message || "Server error");
-  }
-
-  return data;
+function escapeHTML(value) {
+  return String(value ?? "").replace(/[&<>"']/g, char => ({
+    "&":"&amp;",
+    "<":"&lt;",
+    ">":"&gt;",
+    '"':"&quot;",
+    "'":"&#039;"
+  })[char]);
 }
 
-// SEARCH
-$("searchForm").addEventListener("submit", async e => {
-  e.preventDefault();
+function safePhone(value) {
+  return String(value || "").replace(/[^\d+]/g, "");
+}
 
-  const button = $("findBtn");
-  const results = $("results");
+// SEARCH: RESULTS ARE SHOWN ONLY AFTER PRESSING SEARCH
+$("searchForm").addEventListener("submit", async function(event) {
+  event.preventDefault();
 
-  results.replaceChildren();
-  showMessage("message", "खोज रहे हैं...");
+  const button = $("searchBtn");
+  const message = $("searchMessage");
+  const section = $("resultsSection");
+  const list = $("resultsList");
+
   button.disabled = true;
+  button.textContent = "खोज रहे हैं...";
+  section.classList.remove("hidden");
+  list.innerHTML = "";
+  showMessage(message, "जानकारी खोजी जा रही है...", "info");
+
+  const params = new URLSearchParams({
+    village: $("village").value.trim(),
+    tehsil: $("tehsil").value.trim(),
+    district: $("district").value.trim(),
+    type: $("type").value
+  });
 
   try {
-    const params = new URLSearchParams({
-      village: $("village").value.trim(),
-      tehsil: $("tehsil").value.trim(),
-      district: $("district").value.trim(),
-      type: $("type").value
-    });
-
     const response = await fetch("/api/search?" + params.toString());
-    const data = await readResponse(response);
+    const data = await response.json();
 
-    if (!Array.isArray(data.results)) {
-      throw new Error("Server से सही परिणाम नहीं मिले");
+    if (!response.ok || data.ok === false) {
+      throw new Error(data.error || "खोज नहीं हो सकी");
     }
 
-    if (data.results.length === 0) {
-      showMessage(
-        "message",
-        "कोई रिकॉर्ड नहीं मिला। पहले नीचे Admin फॉर्म से डॉक्टर या मेडिकल स्टोर की जानकारी सेव करें।"
-      );
+    const results = Array.isArray(data.results) ? data.results : [];
+
+    if (results.length === 0) {
+      $("resultHeading").textContent = "कोई रिकॉर्ड नहीं मिला";
+      list.innerHTML = `
+        <div class="empty">
+          <div style="font-size:35px">🔍</div>
+          <p>इस गाँव में अभी कोई डॉक्टर या मेडिकल स्टोर नहीं मिला।</p>
+          <p class="muted">नाम और गाँव, तहसील तथा जिले की स्पेलिंग जाँचें।</p>
+        </div>`;
+      showMessage(message, "खोज पूरी हुई। कोई रिकॉर्ड नहीं मिला।", "info");
       return;
     }
 
-    showMessage("message", `कुल ${data.results.length} परिणाम मिले।`);
+    $("resultHeading").textContent = "खोज के परिणाम — " + results.length + " मिले";
 
-    data.results.forEach(place => {
-      const box = document.createElement("div");
-      box.className = "result";
+    list.innerHTML = results.map(place => {
+      const isDoctor = place.type === "doctor";
+      const phone = safePhone(place.phone);
+      const kind = isDoctor ? "डॉक्टर" : "मेडिकल स्टोर";
 
-      const title = document.createElement("h3");
-      title.textContent = place.name;
+      return `
+        <article class="result">
+          <span class="tag">${isDoctor ? "🩺 डॉक्टर" : "💊 मेडिकल स्टोर"}</span>
+          <h3>${escapeHTML(place.name)}</h3>
+          <p class="detail">📍 ${escapeHTML(place.village)}, ${escapeHTML(place.tehsil)}, ${escapeHTML(place.district)}</p>
+          ${place.address ? `<p class="detail">🏠 पता: ${escapeHTML(place.address)}</p>` : ""}
+          ${place.phone ? `<p class="detail">📞 मोबाइल: ${escapeHTML(place.phone)}</p>` : ""}
+          ${(place.open_time || place.close_time) ?
+            `<p class="detail">🕒 समय: ${escapeHTML(place.open_time || "")}${place.open_time && place.close_time ? " से " : ""}${escapeHTML(place.close_time || "")}</p>` : ""}
+          ${place.open_days ? `<p class="detail">📅 दिन: ${escapeHTML(place.open_days)}</p>` : ""}
+          ${phone ? `<a class="call" href="tel:${escapeHTML(phone)}">📞 कॉल करें</a>` : ""}
+        </article>`;
+    }).join("");
 
-      const info = document.createElement("p");
-      info.textContent =
-        (place.type === "doctor" ? "डॉक्टर" : "मेडिकल स्टोर") +
-        " | " + place.village + ", " +
-        place.tehsil + ", " + place.district;
+    showMessage(message, "खोज पूरी हुई। " + results.length + " रिकॉर्ड मिले।", "success");
 
-      const address = document.createElement("p");
-      address.textContent = "पता: " + (place.address || "उपलब्ध नहीं");
-
-      const phone = document.createElement("p");
-      phone.textContent = "फोन: " + (place.phone || "उपलब्ध नहीं");
-
-      box.append(title, info, address, phone);
-
-      if (place.open_time || place.close_time) {
-        const timing = document.createElement("p");
-        timing.textContent =
-          "समय: " + (place.open_time || "—") +
-          " से " + (place.close_time || "—");
-        box.append(timing);
-      }
-
-      if (place.open_days) {
-        const days = document.createElement("p");
-        days.textContent = "खुलने के दिन: " + place.open_days;
-        box.append(days);
-      }
-
-      if (place.phone) {
-        const call = document.createElement("a");
-        call.href = "tel:" + place.phone;
-        call.textContent = "📞 कॉल करें";
-        box.append(call);
-      }
-
-      results.append(box);
-    });
-
-  } catch (err) {
-    showMessage("message", "खोज में समस्या: " + err.message, true);
+  } catch (error) {
+    list.innerHTML = "";
+    $("resultHeading").textContent = "खोज में समस्या";
+    showMessage(message, error.message || "सर्वर से संपर्क नहीं हो सका।", "error");
   } finally {
     button.disabled = false;
+    button.textContent = "🔍 ढूंढो";
   }
 });
 
-// ADD NEW PLACE
-$("adminForm").addEventListener("submit", async e => {
-  e.preventDefault();
+// SAVE: ONLY SHOW SUCCESS MESSAGE. DO NOT SHOW RESULT CARDS.
+$("adminForm").addEventListener("submit", async function(event) {
+  event.preventDefault();
 
-  const button = $("addBtn");
+  const button = $("saveBtn");
+  const message = $("saveMessage");
+
   button.disabled = true;
+  button.textContent = "सेव हो रहा है...";
+  showMessage(message, "जानकारी सेव की जा रही है...", "info");
+
+  const payload = {
+    name: $("name").value.trim(),
+    type: $("adminType").value,
+    village: $("adminVillage").value.trim(),
+    tehsil: $("adminTehsil").value.trim(),
+    district: $("adminDistrict").value.trim(),
+    address: $("address").value.trim(),
+    phone: $("phone").value.trim(),
+    openTime: $("openTime").value.trim(),
+    closeTime: $("closeTime").value.trim(),
+    openDays: $("openDays").value.trim()
+  };
 
   try {
-    const payload = {
-      name: $("name").value.trim(),
-      type: $("newType").value,
-      village: $("newVillage").value.trim(),
-      tehsil: $("newTehsil").value.trim(),
-      district: $("newDistrict").value.trim(),
-      address: $("address").value.trim(),
-      phone: $("phone").value.trim(),
-      openTime: $("openTime").value || null,
-      closeTime: $("closeTime").value || null,
-      openDays: $("openDays").value.trim()
-    };
-
     const response = await fetch("/api/places", {
       method: "POST",
       headers: {
@@ -285,48 +262,28 @@ $("adminForm").addEventListener("submit", async e => {
       body: JSON.stringify(payload)
     });
 
-    const data = await readResponse(response);
+    const data = await response.json();
 
-    showMessage(
-      "adminMessage",
-      data.message || "जानकारी सफलतापूर्वक सेव हो गई।"
-    );
+    if (!response.ok || data.ok === false) {
+      throw new Error(data.error || data.message || "जानकारी सेव नहीं हो सकी");
+    }
+
+    // Success message only. No search and no result card here.
+    showMessage(message, "✅ जानकारी सफलतापूर्वक सेव हो गई!", "success");
 
     const savedKey = $("adminKey").value;
     $("adminForm").reset();
     $("adminKey").value = savedKey;
 
-  } catch (err) {
-    showMessage("adminMessage", "सेव नहीं हुआ: " + err.message, true);
+  } catch (error) {
+    showMessage(message, "सेव नहीं हुआ: " + error.message, "error");
   } finally {
     button.disabled = false;
-  }
-});
-
-// DATABASE STATUS
-$("healthBtn").addEventListener("click", async () => {
-  const button = $("healthBtn");
-  button.disabled = true;
-
-  showMessage("healthMessage", "जाँच हो रही है...");
-
-  try {
-    const response = await fetch("/api/health");
-    const data = await readResponse(response);
-
-    showMessage(
-      "healthMessage",
-      "Database Connected | कुल रिकॉर्ड: " + data.totalPlaces
-    );
-
-  } catch (err) {
-    showMessage("healthMessage", err.message, true);
-  } finally {
-    button.disabled = false;
+    button.textContent = "💾 जानकारी सेव करें";
   }
 });
 </script>
 
 </body>
- </html>
- 
+                                         </html>
+                                      
