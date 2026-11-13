@@ -3,6 +3,7 @@ const express = require("express");
 const { Pool } = require("pg");
 const rateLimit = require("express-rate-limit");
 const path = require("path");
+const crypto = require("crypto");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -15,15 +16,11 @@ if (!process.env.DATABASE_URL || !process.env.ADMIN_KEY) {
 app.set("trust proxy", 1);
 app.use(express.json({ limit: "30kb" }));
 
-// Serve frontend from public folder
-app.use(express.static(path.join(__dirname, "public")));
-
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl:
-    process.env.NODE_ENV === "production"
-      ? { rejectUnauthorized: false }
-      : false,
+  ssl: process.env.NODE_ENV === "production"
+    ? { rejectUnauthorized: false }
+    : false,
 });
 
 async function initDB() {
@@ -53,16 +50,17 @@ async function initDB() {
 }
 
 function adminAuth(req, res, next) {
-  const supplied = req.headers["x-admin-key"] || "";
-  const expected = process.env.ADMIN_KEY;
+  const supplied = Buffer.from(req.headers["x-admin-key"] || "");
+  const expected = Buffer.from(process.env.ADMIN_KEY);
 
-  const a = Buffer.from(supplied);
-  const b = Buffer.from(expected);
-
-  const crypto = require("crypto");
-
-  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
-    return res.status(401).json({ error: "Unauthorized" });
+  if (
+    supplied.length !== expected.length ||
+    !crypto.timingSafeEqual(supplied, expected)
+  ) {
+    return res.status(401).json({
+      ok: false,
+      error: "गलत Admin Key",
+    });
   }
 
   next();
@@ -77,26 +75,43 @@ const searchLimiter = rateLimit({
 
 app.get("/api/health", async (req, res) => {
   try {
-    await pool.query("SELECT 1");
-    res.json({ ok: true, database: "connected" });
+    const result = await pool.query(
+      "SELECT COUNT(*)::int AS total_places FROM places"
+    );
+
+    res.json({
+      ok: true,
+      database: "connected",
+      totalPlaces: result.rows[0].total_places,
+    });
   } catch (err) {
-    console.error("Health check error:", err.message);
-    res.status(503).json({ ok: false, database: "disconnected" });
+    console.error("Health error:", err.message);
+    res.status(503).json({
+      ok: false,
+      database: "disconnected",
+    });
   }
 });
 
 app.get("/api/search", searchLimiter, async (req, res) => {
   try {
-    const { village, tehsil, district, type = "all" } = req.query;
+    const village = String(req.query.village || "").trim();
+    const tehsil = String(req.query.tehsil || "").trim();
+    const district = String(req.query.district || "").trim();
+    const type = String(req.query.type || "all").trim();
 
     if (!village || !tehsil || !district) {
       return res.status(400).json({
-        error: "Village, tehsil and district are required",
+        ok: false,
+        error: "गाँव, तहसील और जिला भरना जरूरी है",
       });
     }
 
     if (!["all", "doctor", "medical"].includes(type)) {
-      return res.status(400).json({ error: "Invalid type" });
+      return res.status(400).json({
+        ok: false,
+        error: "गलत प्रकार चुना गया है",
+      });
     }
 
     const values = [
@@ -106,10 +121,12 @@ app.get("/api/search", searchLimiter, async (req, res) => {
     ];
 
     let sql = `
-      SELECT * FROM places
-      WHERE village ILIKE $1
-      AND tehsil ILIKE $2
-      AND district ILIKE $3
+      SELECT id, name, type, village, tehsil, district,
+             address, phone, open_time, close_time, open_days
+      FROM places
+      WHERE LOWER(BTRIM(village)) LIKE LOWER($1)
+        AND LOWER(BTRIM(tehsil)) LIKE LOWER($2)
+        AND LOWER(BTRIM(district)) LIKE LOWER($3)
     `;
 
     if (type !== "all") {
@@ -120,10 +137,18 @@ app.get("/api/search", searchLimiter, async (req, res) => {
     sql += " ORDER BY name ASC LIMIT 100";
 
     const result = await pool.query(sql, values);
-    res.json({ ok: true, results: result.rows });
+
+    res.json({
+      ok: true,
+      count: result.rows.length,
+      results: result.rows,
+    });
   } catch (err) {
     console.error("Search error:", err.message);
-    res.status(500).json({ error: "Search failed" });
+    res.status(500).json({
+      ok: false,
+      error: "Search में सर्वर की समस्या हुई",
+    });
   }
 });
 
@@ -143,53 +168,63 @@ app.post("/api/places", adminAuth, async (req, res) => {
     } = req.body;
 
     if (
-      !name ||
-      !village ||
-      !tehsil ||
-      !district ||
+      !name?.trim() ||
+      !village?.trim() ||
+      !tehsil?.trim() ||
+      !district?.trim() ||
       !["doctor", "medical"].includes(type)
     ) {
-      return res.status(400).json({ error: "Invalid or missing fields" });
+      return res.status(400).json({
+        ok: false,
+        error: "सभी जरूरी जानकारी सही भरें",
+      });
     }
 
     const result = await pool.query(
       `INSERT INTO places
-      (name, type, village, tehsil, district, address, phone,
-       open_time, close_time, open_days)
+      (name, type, village, tehsil, district, address,
+       phone, open_time, close_time, open_days)
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
       RETURNING *`,
       [
-        name,
+        name.trim(),
         type,
-        village,
-        tehsil,
-        district,
-        address || null,
-        phone || null,
+        village.trim(),
+        tehsil.trim(),
+        district.trim(),
+        address?.trim() || null,
+        phone?.trim() || null,
         openTime || null,
         closeTime || null,
-        openDays || null,
+        openDays?.trim() || null,
       ]
     );
 
     res.status(201).json({
       ok: true,
+      message: "जानकारी सफलतापूर्वक सेव हो गई",
       place: result.rows[0],
     });
   } catch (err) {
     console.error("Add place error:", err.message);
-    res.status(500).json({ error: "Could not add place" });
+    res.status(500).json({
+      ok: false,
+      error: "जानकारी सेव नहीं हो सकी",
+    });
   }
 });
 
-// Serve index.html from public folder
+app.use(express.static(path.join(__dirname, "public")));
+
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-// 404 handler
 app.use((req, res) => {
-  res.status(404).json({ error: "Not found" });
+  res.status(404).json({
+    ok: false,
+    error: "Not found",
+  });
 });
 
 async function startServer() {
