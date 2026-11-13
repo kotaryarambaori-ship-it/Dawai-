@@ -1,111 +1,213 @@
+
 const express = require("express");
-const fs = require("fs");
+const { Pool } = require("pg");
+const rateLimit = require("express-rate-limit");
 const path = require("path");
+const crypto = require("crypto");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const ADMIN_KEY = process.env.ADMIN_KEY || "";
-const DB = path.join(__dirname, "places.json");
+const DATABASE_URL = process.env.DATABASE_URL;
+const ADMIN_KEY = process.env.ADMIN_KEY;
 
-// Demo data (nakli naam aur number, sirf test ke liye)
-const DEMO = [
-  { id: "d1", kind: "dawai", name: "Demo Medical Store", village: "Panduwa", tehsil: "Demo Tehsil", district: "Demo Zila", phone: "9000000001", open: "09:00", close: "21:00", closedDay: "", note: "Raat ki dawai ke liye bell bajao" },
-  { id: "d2", kind: "doctor", name: "Dr. Demo Sharma", village: "Panduwa", tehsil: "Demo Tehsil", district: "Demo Zila", phone: "9000000002", open: "10:00", close: "14:00", closedDay: "Sun", note: "General physician" }
-];
-
-function load() {
-  try { const d = JSON.parse(fs.readFileSync(DB, "utf8")); return Array.isArray(d) ? d : DEMO; }
-  catch { return DEMO; }
-}
-const clean = (v, n = 80) => String(v == null ? "" : v).trim().slice(0, n);
-const validTime = t => /^([01]\d|2[0-3]):[0-5]\d$/.test(t);
-const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const has = (field, q) => !q || String(field || "").toLowerCase().includes(q.toLowerCase());
-
-// India ke samay (IST) mein abhi khula hai ya nahi
-function isOpenNow(p) {
-  const parts = new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Asia/Kolkata", weekday: "short", hour: "2-digit", minute: "2-digit", hour12: false
-  }).formatToParts(new Date());
-  const get = t => parts.find(x => x.type === t).value;
-  const day = get("weekday");
-  const now = Number(get("hour")) % 24 * 60 + Number(get("minute"));
-  if (p.closedDay && p.closedDay === day) return false;
-  const [oh, om] = p.open.split(":").map(Number);
-  const [ch, cm] = p.close.split(":").map(Number);
-  const o = oh * 60 + om, c = ch * 60 + cm;
-  return c > o ? now >= o && now < c : now >= o || now < c;
+if (!DATABASE_URL || !ADMIN_KEY) {
+  console.error("DATABASE_URL या ADMIN_KEY missing है।");
+  process.exit(1);
 }
 
-// Pehle gaon, nahi mila to usi tehsil, phir usi zila ke record
-function findPlaces(all, q) {
-  const base = all.filter(p => (!q.kind || p.kind === q.kind) && (!q.onlyOpen || p.openNow));
-  let places = base.filter(p => has(p.village, q.village) && has(p.tehsil, q.tehsil) && has(p.district, q.district));
-  if (places.length) return { places, level: "gaon" };
-  if (q.village && q.tehsil) {
-    places = base.filter(p => has(p.tehsil, q.tehsil) && has(p.district, q.district));
-    if (places.length) return { places, level: "tehsil" };
-  }
-  if (q.district) {
-    places = base.filter(p => has(p.district, q.district));
-    if (places.length) return { places, level: "zila" };
-  }
-  return { places: [], level: "none" };
+app.set("trust proxy", 1);
+app.use(express.json({ limit: "30kb" }));
+
+const pool = new Pool({
+  connectionString: DATABASE_URL,
+  ssl: process.env.NODE_ENV === "production"
+    ? { rejectUnauthorized: false }
+    : undefined
+});
+
+const limiter = rateLimit({
+  windowMs: 60000,
+  limit: 60,
+  standardHeaders: "draft-7",
+  legacyHeaders: false
+});
+
+async function initDB() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS places (
+      id BIGSERIAL PRIMARY KEY,
+      name VARCHAR(160) NOT NULL,
+      type VARCHAR(20) NOT NULL
+        CHECK(type IN ('doctor','medical')),
+      village VARCHAR(120) NOT NULL,
+      tehsil VARCHAR(120) NOT NULL,
+      district VARCHAR(120) NOT NULL,
+      address TEXT DEFAULT '',
+      phone VARCHAR(20) DEFAULT '',
+      open_time TIME,
+      close_time TIME,
+      open_days INTEGER[] NOT NULL
+        DEFAULT ARRAY[0,1,2,3,4,5,6],
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS places_location_idx
+    ON places
+    (LOWER(village),LOWER(tehsil),LOWER(district),type)
+  `);
+
+  console.log("Database ready");
 }
 
-app.use(express.json());
-app.use(express.static(path.join(__dirname, "public")));
+function adminAuth(req,res,next) {
+  const key = req.get("x-admin-key") || "";
+  const a = Buffer.from(key);
+  const b = Buffer.from(ADMIN_KEY);
 
-app.get("/api/search", (req, res) => {
-  const q = {
-    village: clean(req.query.village),
-    tehsil: clean(req.query.tehsil),
-    district: clean(req.query.district),
-    kind: clean(req.query.kind),
-    onlyOpen: req.query.open === "1"
-  };
-  if (!q.village && !q.tehsil && !q.district) {
-    return res.status(400).json({ error: "Gaon, tehsil ya zila mein se kam se kam ek likho." });
+  if (a.length !== b.length ||
+      !crypto.timingSafeEqual(a,b)) {
+    return res.status(401).json({
+      message:"Admin key गलत है।"
+    });
+  }
+  next();
+}
+
+app.get("/api/health", async(req,res) => {
+  try {
+    await pool.query("SELECT 1");
+    res.json({ok:true,database:"connected"});
+  } catch(error) {
+    console.error(error);
+    res.status(503).json({
+      ok:false,database:"disconnected"
+    });
+  }
+});
+
+app.get("/api/search",limiter,async(req,res) => {
+  const village = String(req.query.village || "").trim();
+  const tehsil = String(req.query.tehsil || "").trim();
+  const district = String(req.query.district || "").trim();
+  const type = String(req.query.type || "all");
+
+  if (!village || !tehsil || !district) {
+    return res.status(400).json({
+      message:"गाँव, तहसील और जिला भरें।",
+      results:[]
+    });
   }
 
-  const all = load().map(p => ({ ...p, openNow: isOpenNow(p) }));
-  const { places, level } = findPlaces(all, q);
-  places.sort((a, b) => Number(b.openNow) - Number(a.openNow));
+  if (!["all","doctor","medical"].includes(type)) {
+    return res.status(400).json({
+      message:"खोज का प्रकार सही नहीं है।",
+      results:[]
+    });
+  }
 
-  const messages = {
-    gaon: places.length + " jagah mili.",
-    tehsil: "Aapke gaon ka record nahi mila. Isi tehsil ke ye hain (phone karke pooch lo).",
-    zila: "Aapke gaon ya tehsil ka record nahi mila. Isi zila ke ye hain (phone karke pooch lo).",
-    none: "Abhi is jagah ka koi record nahi hai. Admin se record jodne ko kaho."
-  };
-  res.json({
-    found: places.length > 0,
-    level,
-    count: places.length,
-    places: places.slice(0, 50),
-    message: messages[level]
+  try {
+    const values = [
+      `%${village}%`,
+      `%${tehsil}%`,
+      `%${district}%`
+    ];
+
+    let sql = `
+      SELECT id,name,type,village,tehsil,district,
+      address,phone,open_time::text,close_time::text
+      FROM places
+      WHERE village ILIKE $1
+      AND tehsil ILIKE $2
+      AND district ILIKE $3
+    `;
+
+    if(type !== "all") {
+      values.push(type);
+      sql += ` AND type = $${values.length}`;
+    }
+
+    sql += " ORDER BY name LIMIT 100";
+
+    const result = await pool.query(sql,values);
+
+    res.json({
+      message:result.rows.length
+        ? `${result.rows.length} परिणाम मिले।`
+        : "इस क्षेत्र में कोई जानकारी नहीं मिली।",
+      count:result.rows.length,
+      results:result.rows
+    });
+
+  } catch(error) {
+    console.error("Search error:",error);
+    res.status(500).json({
+      message:"सर्वर में खोज की समस्या आई।",
+      results:[]
+    });
+  }
+});
+
+app.post("/api/places",adminAuth,async(req,res) => {
+  const {
+    name,type,village,tehsil,district,
+    address="",phone="",openTime=null,
+    closeTime=null
+  } = req.body || {};
+
+  if(!name || !village || !tehsil || !district ||
+     !["doctor","medical"].includes(type)) {
+    return res.status(400).json({
+      message:"सभी जरूरी जानकारी सही भरें।"
+    });
+  }
+
+  try {
+    const result = await pool.query(`
+      INSERT INTO places
+      (name,type,village,tehsil,district,address,
+       phone,open_time,close_time)
+      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)
+      RETURNING *
+    `,[
+      name,type,village,tehsil,district,
+      address,phone,openTime,closeTime
+    ]);
+
+    res.status(201).json({
+      message:"जानकारी सफलतापूर्वक सेव हो गई।",
+      place:result.rows[0]
+    });
+
+  } catch(error) {
+    console.error(error);
+    res.status(500).json({
+      message:"Database में जानकारी सेव नहीं हुई।"
+    });
+  }
+});
+
+app.get("/",(req,res) => {
+  res.sendFile(path.join(__dirname,"index.html"));
+});
+
+app.use((req,res) => {
+  res.status(404).json({
+    message:"Page या API नहीं मिला।"
   });
 });
 
-app.post("/api/places", (req, res) => {
-  if (!ADMIN_KEY) return res.status(403).json({ error: "Record jodna band hai. Render mein ADMIN_KEY set karo." });
-  if (req.get("x-admin-key") !== ADMIN_KEY) return res.status(401).json({ error: "Galat admin key." });
-  const b = req.body || {};
-  const p = {
-    id: Date.now().toString(36),
-    kind: b.kind === "doctor" ? "doctor" : "dawai",
-    name: clean(b.name), village: clean(b.village), tehsil: clean(b.tehsil), district: clean(b.district),
-    phone: clean(b.phone, 15).replace(/[^\d+]/g, ""),
-    open: clean(b.open, 5), close: clean(b.close, 5),
-    closedDay: DAYS.includes(b.closedDay) ? b.closedDay : "",
-    note: clean(b.note, 120)
-  };
-  if (!p.name || !p.village) return res.status(400).json({ error: "Naam aur gaon zaroori hain." });
-  if (!validTime(p.open) || !validTime(p.close)) return res.status(400).json({ error: "Khulne aur band hone ka samay sahi bharo." });
-  const list = fs.existsSync(DB) ? load() : [];
-  list.push(p);
-  fs.writeFileSync(DB, JSON.stringify(list, null, 2));
-  res.status(201).json({ ok: true, place: p, message: p.name + " add ho gaya." });
+initDB().then(() => {
+  app.listen(PORT,() => {
+    console.log("Server running on port",PORT);
+  });
+}).catch(error => {
+  console.error("Database initialization failed:",error);
+  process.exit(1);
 });
 
-app.listen(PORT, () => console.log("Dawai app running on port " + PORT));
+process.on("SIGTERM",async() => {
+  await pool.end();
+  process.exit(0);
+});
