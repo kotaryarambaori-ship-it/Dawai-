@@ -41,6 +41,26 @@ async function initDB() {
     )
   `);
 
+  // पुराने Database में open_days ARRAY हो सकता है.
+  // उसे TEXT में बदलकर पुराने दिनों की जानकारी सुरक्षित रखें.
+  const column = await pool.query(`
+    SELECT data_type
+    FROM information_schema.columns
+    WHERE table_schema = current_schema()
+      AND table_name = 'places'
+      AND column_name = 'open_days'
+  `);
+
+  if (column.rows[0]?.data_type === "ARRAY") {
+    await pool.query(`
+      ALTER TABLE places
+      ALTER COLUMN open_days TYPE TEXT
+      USING array_to_string(open_days, ', ')
+    `);
+
+    console.log("open_days column converted to TEXT");
+  }
+
   await pool.query(`
     CREATE INDEX IF NOT EXISTS places_location_type_idx
     ON places (LOWER(village), LOWER(tehsil), LOWER(district), type)
@@ -86,6 +106,7 @@ app.get("/api/health", async (req, res) => {
     });
   } catch (err) {
     console.error("Health error:", err.message);
+
     res.status(503).json({
       ok: false,
       database: "disconnected",
@@ -131,7 +152,7 @@ app.get("/api/search", searchLimiter, async (req, res) => {
 
     if (type !== "all") {
       values.push(type);
-      sql += ` AND type = $4`;
+      sql += " AND type = $4";
     }
 
     sql += " ORDER BY name ASC LIMIT 100";
@@ -145,6 +166,7 @@ app.get("/api/search", searchLimiter, async (req, res) => {
     });
   } catch (err) {
     console.error("Search error:", err.message);
+
     res.status(500).json({
       ok: false,
       error: "Search में सर्वर की समस्या हुई",
@@ -207,6 +229,7 @@ app.post("/api/places", adminAuth, async (req, res) => {
     });
   } catch (err) {
     console.error("Add place error:", err.message);
+
     res.status(500).json({
       ok: false,
       error: "जानकारी सेव नहीं हो सकी",
